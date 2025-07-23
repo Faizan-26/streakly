@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  appwrite: ^17.0.2
+  riverpod: ^2.6.1
 
 dev_dependencies:
   flutter_test:

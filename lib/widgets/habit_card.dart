@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:streakly/model/habit_model.dart';
 import 'package:streakly/controllers/habit_controller.dart';
 import 'package:streakly/types/habit_type.dart';
+import 'package:streakly/theme/app_typography.dart';
 
 class HabitCard extends ConsumerWidget {
   final Habit habit;
@@ -63,18 +64,15 @@ class HabitCard extends ConsumerWidget {
                       children: [
                         Text(
                           habit.title,
-                          style: const TextStyle(
+                          style: AppTypography.cardTitle.copyWith(
                             color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           _getHabitTypeText(habit.type),
-                          style: TextStyle(
+                          style: AppTypography.bodySmall.copyWith(
                             color: Colors.grey[400],
-                            fontSize: 12,
                           ),
                         ),
                       ],
@@ -105,11 +103,10 @@ class HabitCard extends ConsumerWidget {
                       const SizedBox(width: 4),
                       Text(
                         '$streakCount day${streakCount != 1 ? 's' : ''}',
-                        style: TextStyle(
+                        style: AppTypography.bodySmall.copyWith(
                           color: streakCount > 0
                               ? Colors.orange
                               : Colors.grey[600],
-                          fontSize: 12,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -128,9 +125,8 @@ class HabitCard extends ConsumerWidget {
                         const SizedBox(width: 4),
                         Text(
                           _formatTime(habit.reminderTime!),
-                          style: TextStyle(
+                          style: AppTypography.bodySmall.copyWith(
                             color: Colors.grey[500],
-                            fontSize: 12,
                           ),
                         ),
                       ],

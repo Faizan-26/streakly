@@ -1,5 +1,9 @@
+import 'package:device_preview_plus/device_preview_plus.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:streakly/pages/onboarding/page.dart';
 import 'package:streakly/services/notification_service.dart';
 import 'package:streakly/pages/home_page.dart';
 import 'package:streakly/utils/habit_data_migration.dart';
@@ -15,7 +19,12 @@ void main() async {
   await NotificationManager.initialize();
   await NotificationManager.setupIsolateListener();
 
-  runApp(ProviderScope(child: MainApp()));
+  runApp(
+    DevicePreview(
+      enabled: false,
+      builder: (context) => ProviderScope(child: MainApp()), // Wrap your app
+    ),
+  );
 }
 
 class MainApp extends StatelessWidget {
@@ -25,12 +34,11 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Streakly - Habit Tracker',
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: const Color(0xFF1A1A1A),
-      ),
-      home: const HomePage(),
+      useInheritedMediaQuery: true,
+      locale: DevicePreview.locale(context),
+      builder: DevicePreview.appBuilder,
+
+      home: const OnBoardingPage(),
       debugShowCheckedModeBanner: false,
     );
   }

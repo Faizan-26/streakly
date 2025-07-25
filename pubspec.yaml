@@ -1,6 +1,6 @@
 name: streakly
 description: "A new Flutter project."
-publish_to: 'none'
+publish_to: "none"
 version: 0.1.0
 
 environment:
@@ -16,6 +16,9 @@ dependencies:
   flutter_riverpod: ^2.6.1
   riverpod_annotation: ^2.6.1
   awesome_notifications: ^0.10.1
+  flutter_animate: ^4.5.2
+  device_preview_plus: ^2.4.6
+  font_awesome_flutter: ^10.8.0
 
 dev_dependencies:
   flutter_test:
@@ -27,3 +30,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/logo.png
+    - assets/worldmap.png
+    # - assets/icons/
+    # - assets/fonts/

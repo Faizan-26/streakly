@@ -4,8 +4,10 @@ import 'package:streakly/model/habit_model.dart';
 import 'package:streakly/types/habit_frequency_types.dart';
 import 'package:streakly/types/habit_type.dart';
 import 'package:streakly/types/time_of_day_type.dart';
+import 'package:streakly/services/local_storage.dart';
 import 'dart:isolate';
 import 'dart:ui';
+import 'dart:convert';
 
 /// Helper class to manage notification initialization and action handling
 class NotificationManager {
@@ -219,6 +221,42 @@ class NotificationService {
         repeats: false,
       ),
       actionButtons: actionButtons,
+    );
+  }
+
+  /// Schedule a daily reminder notification (for start/end of day)
+  static Future<bool> scheduleDailyReminder({
+    required String id,
+    required String title,
+    required String body,
+    required int hour,
+    required int minute,
+    required String type,
+  }) async {
+    final notificationId = id.hashCode;
+
+    return await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: notificationId,
+        channelKey: _habitChannelKey,
+        groupKey: 'daily_reminders',
+        title: title,
+        body: body,
+        notificationLayout: NotificationLayout.Default,
+        category: NotificationCategory.Reminder,
+        wakeUpScreen: true,
+        fullScreenIntent: false,
+        autoDismissible: true,
+        backgroundColor: const Color(0xFF6366F1),
+        payload: {'reminder_id': id, 'reminder_type': type},
+      ),
+      schedule: NotificationCalendar(
+        hour: hour,
+        minute: minute,
+        second: 0,
+        millisecond: 0,
+        repeats: true, // Repeat daily
+      ),
     );
   }
 
@@ -537,5 +575,182 @@ class NotificationService {
       // This is a simplified example
       print('Rescheduling for ${snoozeDate.toString()}');
     }
+  }
+
+  // MARK: - Notification Settings Management
+
+  /// Save daily notification settings to local storage
+  static Future<void> saveDailyNotificationSettings({
+    required bool startOfDayEnabled,
+    required bool endOfDayEnabled,
+    required int wakeUpHour,
+    required int wakeUpMinute,
+    required int sleepHour,
+    required int sleepMinute,
+  }) async {
+    final settings = {
+      'startOfDayEnabled': startOfDayEnabled,
+      'endOfDayEnabled': endOfDayEnabled,
+      'wakeUpHour': wakeUpHour,
+      'wakeUpMinute': wakeUpMinute,
+      'sleepHour': sleepHour,
+      'sleepMinute': sleepMinute,
+      'lastUpdated': DateTime.now().toIso8601String(),
+    };
+
+    await LocalStorage.saveData(
+      'daily_notification_settings',
+      json.encode(settings),
+    );
+  }
+
+  /// Load daily notification settings from local storage
+  static Future<Map<String, dynamic>?> loadDailyNotificationSettings() async {
+    final settingsJson = await LocalStorage.loadData(
+      'daily_notification_settings',
+    );
+    if (settingsJson != null) {
+      return json.decode(settingsJson as String);
+    }
+    return null;
+  }
+
+  /// Update the enabled/disabled state of start of day notification
+  static Future<void> updateStartOfDayNotification(bool enabled) async {
+    final settings = await loadDailyNotificationSettings();
+    if (settings != null) {
+      settings['startOfDayEnabled'] = enabled;
+      await LocalStorage.saveData(
+        'daily_notification_settings',
+        json.encode(settings),
+      );
+
+      if (enabled) {
+        // Re-schedule the notification
+        await scheduleDailyReminder(
+          id: 'daily_start',
+          title: '🌅 Good Morning!',
+          body:
+              'Ready to start your day? Check your habits and make today count!',
+          hour: settings['wakeUpHour'],
+          minute: settings['wakeUpMinute'],
+          type: 'start_of_day',
+        );
+      } else {
+        // Cancel the notification
+        await cancelDailyReminder('daily_start');
+      }
+    }
+  }
+
+  /// Update the enabled/disabled state of end of day notification
+  static Future<void> updateEndOfDayNotification(bool enabled) async {
+    final settings = await loadDailyNotificationSettings();
+    if (settings != null) {
+      settings['endOfDayEnabled'] = enabled;
+      await LocalStorage.saveData(
+        'daily_notification_settings',
+        json.encode(settings),
+      );
+
+      if (enabled) {
+        // Re-schedule the notification
+        await scheduleDailyReminder(
+          id: 'daily_end',
+          title: '🌙 Day Review',
+          body:
+              'How did you do today? Mark your completed habits and prepare for tomorrow!',
+          hour: settings['sleepHour'],
+          minute: settings['sleepMinute'],
+          type: 'end_of_day',
+        );
+      } else {
+        // Cancel the notification
+        await cancelDailyReminder('daily_end');
+      }
+    }
+  }
+
+  /// Update wake up time and reschedule start of day notification if enabled
+  static Future<void> updateWakeUpTime(int hour, int minute) async {
+    final settings = await loadDailyNotificationSettings();
+    if (settings != null) {
+      settings['wakeUpHour'] = hour;
+      settings['wakeUpMinute'] = minute;
+      settings['lastUpdated'] = DateTime.now().toIso8601String();
+      await LocalStorage.saveData(
+        'daily_notification_settings',
+        json.encode(settings),
+      );
+
+      // Reschedule if enabled
+      if (settings['startOfDayEnabled'] == true) {
+        await scheduleDailyReminder(
+          id: 'daily_start',
+          title: '🌅 Good Morning!',
+          body:
+              'Ready to start your day? Check your habits and make today count!',
+          hour: hour,
+          minute: minute,
+          type: 'start_of_day',
+        );
+      }
+    }
+  }
+
+  /// Update sleep time and reschedule end of day notification if enabled
+  static Future<void> updateSleepTime(int hour, int minute) async {
+    final settings = await loadDailyNotificationSettings();
+    if (settings != null) {
+      settings['sleepHour'] = hour;
+      settings['sleepMinute'] = minute;
+      settings['lastUpdated'] = DateTime.now().toIso8601String();
+      await LocalStorage.saveData(
+        'daily_notification_settings',
+        json.encode(settings),
+      );
+
+      // Reschedule if enabled
+      if (settings['endOfDayEnabled'] == true) {
+        await scheduleDailyReminder(
+          id: 'daily_end',
+          title: '🌙 Day Review',
+          body:
+              'How did you do today? Mark your completed habits and prepare for tomorrow!',
+          hour: hour,
+          minute: minute,
+          type: 'end_of_day',
+        );
+      }
+    }
+  }
+
+  /// Cancel a daily reminder notification
+  static Future<void> cancelDailyReminder(String id) async {
+    final notificationId = id.hashCode;
+    await AwesomeNotifications().cancel(notificationId);
+  }
+
+  /// Get current notification settings for settings UI
+  static Future<Map<String, dynamic>> getNotificationSettingsForUI() async {
+    final settings = await loadDailyNotificationSettings();
+    if (settings != null) {
+      return {
+        'startOfDayEnabled': settings['startOfDayEnabled'] ?? true,
+        'endOfDayEnabled': settings['endOfDayEnabled'] ?? true,
+        'wakeUpHour': settings['wakeUpHour'] ?? 8,
+        'wakeUpMinute': settings['wakeUpMinute'] ?? 0,
+        'sleepHour': settings['sleepHour'] ?? 23,
+        'sleepMinute': settings['sleepMinute'] ?? 0,
+      };
+    }
+    return {
+      'startOfDayEnabled': true,
+      'endOfDayEnabled': true,
+      'wakeUpHour': 8,
+      'wakeUpMinute': 0,
+      'sleepHour': 23,
+      'sleepMinute': 0,
+    };
   }
 }

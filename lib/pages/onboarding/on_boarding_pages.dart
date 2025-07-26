@@ -3,10 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:streakly/controllers/theme_controller.dart';
 import 'package:streakly/theme/app_colors.dart';
 import 'package:streakly/theme/app_typography.dart';
+import 'package:streakly/widgets/icon_library_bottomsheet.dart';
 import 'package:streakly/widgets/primary_button.dart';
+import 'package:streakly/widgets/loading_indicator.dart';
+import 'package:streakly/controllers/habit_controller.dart';
+import 'package:streakly/model/habit_model.dart';
+import 'package:streakly/services/notification_service.dart';
+import 'package:streakly/types/habit_frequency_types.dart';
+import 'package:streakly/types/habit_type.dart';
 
 class OnBoardingPages extends ConsumerStatefulWidget {
   const OnBoardingPages({super.key});
@@ -38,17 +46,43 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
   // Page 4 data
   String? selectedHabit;
   String customHabit = '';
+  IconData customHabitIcon =
+      FontAwesomeIcons.solidStar; // Default icon for custom habit
   final List<Map<String, dynamic>> habits = [
-    {'icon': '😴', 'title': 'Sleep over 8h', 'color': Colors.blue},
-    {'icon': '🍎', 'title': 'Have a healthy meal', 'color': Colors.purple},
-    {'icon': '💧', 'title': 'Drink 8 cups of water', 'color': Colors.orange},
-    {'icon': '💪', 'title': 'Workout', 'color': Colors.cyan},
-    {'icon': '🚶', 'title': 'Walking', 'color': Colors.green},
+    {
+      'icon': FontAwesomeIcons.bed,
+      'title': 'Sleep over 8h',
+      'color': Colors.blue,
+    },
+    {
+      'icon': FontAwesomeIcons.appleWhole,
+      'title': 'Have a healthy meal',
+      'color': Colors.purple,
+    },
+    {
+      'icon': FontAwesomeIcons.droplet,
+      'title': 'Drink 8 cups of water',
+      'color': Colors.orange,
+    },
+    {
+      'icon': FontAwesomeIcons.dumbbell,
+      'title': 'Workout',
+      'color': Colors.cyan,
+    },
+    {
+      'icon': FontAwesomeIcons.personWalking,
+      'title': 'Walking',
+      'color': Colors.green,
+    },
   ];
+
+  // Page 5 data - Goal setting
+  String goalType = 'minutes'; // only minutes
+  int goalValue = 30;
 
   void nextPage() {
     HapticFeedback.lightImpact();
-    if (currentPage < 3) {
+    if (currentPage < 4) {
       setState(() {
         currentPage++;
       });
@@ -58,7 +92,7 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
       );
     } else {
       // Complete onboarding
-      print('Onboarding completed!');
+      _completeOnboarding();
     }
   }
 
@@ -86,6 +120,151 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
     });
   }
 
+  void _completeOnboarding() {
+    // Show loading page first
+    _showLoadingAndCreateHabit();
+  }
+
+  void _showLoadingAndCreateHabit() {
+    final habitData = _getSelectedHabitData();
+
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => LoadingIndicatorPage(
+          title: 'Generating your habit plan...',
+          subtitle:
+              'Setting up your "${habitData['name']}" habit and daily reminders',
+          icon: habitData['icon'] as IconData,
+          iconColor: green,
+          duration: const Duration(seconds: 3),
+          onComplete: () {
+            // After loading animation completes:
+            // 1. Create the habit with user's selected goals and preferences
+            // 2. Create and store daily notifications (wake up & sleep time)
+            // 3. Save notification settings for future management in settings
+            _createHabitAndNotifications();
+          },
+        ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    );
+  }
+
+  Future<void> _createHabitAndNotifications() async {
+    try {
+      final habitData = _getSelectedHabitData();
+
+      // Create the habit
+      final habit = Habit(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: habitData['name'],
+        type: HabitType.regular,
+        frequency: Frequency(type: FrequencyType.daily),
+        timeOfDay: null, // Not specified during onboarding
+        goalDuration: _getGoalDuration(),
+        goalCount: _getGoalCount(),
+        hasReminder: false, // Individual habit reminders are disabled
+        reminderTime: null, // Will use daily start/end notifications instead
+        color: green,
+        icon: habitData['icon'] as IconData,
+        category: selectedCategories.isNotEmpty
+            ? selectedCategories.first
+            : null,
+      );
+
+      // Add habit to controller
+      final habitController = ref.read(habitControllerProvider.notifier);
+      await habitController.addHabit(habit);
+
+      // Create daily notifications for start and end of day
+      await _createDailyNotifications();
+
+      // Navigate to main app
+      _navigateToMainApp();
+    } catch (e) {
+      print('Error creating habit: $e');
+      // Show error and navigate anyway
+      _navigateToMainApp();
+    }
+  }
+
+  Duration? _getGoalDuration() {
+    return Duration(minutes: goalValue);
+  }
+
+  int? _getGoalCount() {
+    return null; // No count-based goals
+  }
+
+  Future<void> _createDailyNotifications() async {
+    // Save notification settings to local storage for future management
+    await NotificationService.saveDailyNotificationSettings(
+      startOfDayEnabled: true, // Enabled by default during onboarding
+      endOfDayEnabled: true, // Enabled by default during onboarding
+      wakeUpHour: wakeUpHour,
+      wakeUpMinute: wakeUpMinute,
+      sleepHour: sleepHour,
+      sleepMinute: sleepMinute,
+    );
+
+    // Create start of day notification
+    await NotificationService.scheduleDailyReminder(
+      id: 'daily_start',
+      title: '🌅 Good Morning!',
+      body: 'Ready to start your day? Check your habits and make today count!',
+      hour: wakeUpHour,
+      minute: wakeUpMinute,
+      type: 'start_of_day',
+    );
+
+    // Create end of day notification
+    await NotificationService.scheduleDailyReminder(
+      id: 'daily_end',
+      title: '🌙 Day Review',
+      body:
+          'How did you do today? Mark your completed habits and prepare for tomorrow!',
+      hour: sleepHour,
+      minute: sleepMinute,
+      type: 'end_of_day',
+    );
+  }
+
+  void _navigateToMainApp() {
+    // Pop the loading page and navigate to main app
+    // Navigator.of(context).pop(); // Remove loading page
+    Navigator.of(context).pop(); // Remove onboarding
+
+    // Navigate to main app (home page)
+    Navigator.pushReplacementNamed(context, '/home');
+  }
+
+  Map<String, dynamic> _getSelectedHabitData() {
+    if (customHabit.isNotEmpty) {
+      return {'name': customHabit, 'icon': customHabitIcon, 'isCustom': true};
+    } else if (selectedHabit != null) {
+      final habit = habits.firstWhere((h) => h['title'] == selectedHabit);
+      return {'name': selectedHabit!, 'icon': habit['icon'], 'isCustom': false};
+    }
+    return {
+      'name': 'Default Habit',
+      'icon': FontAwesomeIcons.solidStar,
+      'isCustom': false,
+    };
+  }
+
+  bool _isNextButtonDisabled() {
+    switch (currentPage) {
+      case 0:
+        return selectedCategories.isEmpty;
+      case 3:
+        return selectedHabit == null && customHabit.isEmpty;
+      default:
+        return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeController = ref.watch(themeControllerProvider.notifier);
@@ -103,6 +282,7 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
             // Page content
             Expanded(
               child: PageView(
+                physics: NeverScrollableScrollPhysics(),
                 controller: pageController,
                 onPageChanged: (index) {
                   setState(() {
@@ -114,10 +294,11 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
                   _buildWakeUpTimePage(isDark),
                   _buildSleepTimePage(isDark),
                   _buildHabitSelectionPage(isDark),
+                  _buildGoalSettingPage(isDark),
                 ],
               ),
             ),
-            currentPage < 3
+            currentPage < 4
                 ? Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 24,
@@ -127,9 +308,7 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
                         primaryButton(
                               text: "Next",
                               onPressed: nextPage,
-                              isDisabled: currentPage == 0
-                                  ? selectedCategories.isEmpty
-                                  : false,
+                              isDisabled: _isNextButtonDisabled(),
                             )
                             .animate()
                             .slideY(begin: 1, duration: 800.ms, delay: 800.ms)
@@ -151,26 +330,26 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
           Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      if (currentPage == 0) {
-                        Navigator.of(context).pop();
-                      } else {
-                        previousPage();
-                      }
-                    },
-                    icon: Icon(
-                      Icons.arrow_back_ios_new,
-                      color: isDark ? Colors.white : darkGreen,
-                      size: 22,
-                    ),
-                  ),
+                  currentPage != 0
+                      ? IconButton(
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            previousPage();
+                          },
+                          icon: Icon(
+                            Icons.arrow_back_ios_new,
+                            color: isDark ? Colors.white : darkGreen,
+                            size: 22,
+                          ),
+                        )
+                      : SizedBox.shrink(),
                   const Spacer(),
                   GestureDetector(
                     onTap: () {
                       HapticFeedback.selectionClick();
-                      print('Skip pressed');
+                      // navigate to home
+                      // Navigator.of(context).pop();
+                      Navigator.of(context).pushReplacementNamed('/home');
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -208,11 +387,11 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
 
           // Progress indicator
           Row(
-                children: List.generate(4, (index) {
+                children: List.generate(5, (index) {
                   return Expanded(
                     child: Container(
                       height: 4,
-                      margin: EdgeInsets.only(right: index < 3 ? 8 : 0),
+                      margin: EdgeInsets.only(right: index < 4 ? 8 : 0),
                       decoration: BoxDecoration(
                         color: index <= currentPage
                             ? (isDark ? Colors.white : darkGreen)
@@ -237,7 +416,6 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 32),
           Text(
                 'What do you want to improve?',
                 style: AppTypography.onboardingTitle.copyWith(
@@ -316,11 +494,10 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
 
   Widget _buildWakeUpTimePage(bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 48),
           Text(
                 'What time do you usually get up?',
                 style: AppTypography.onboardingTitle.copyWith(
@@ -358,6 +535,7 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
               setState(() => wakeUpMinute = minute);
             },
             isDark: isDark,
+            context: context,
           ),
 
           const Spacer(),
@@ -372,7 +550,6 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const SizedBox(height: 48),
           Text(
                 'What time do you usually end your day?',
                 textAlign: TextAlign.left,
@@ -411,6 +588,7 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
               setState(() => sleepMinute = minute);
             },
             isDark: isDark,
+            context: context,
           ),
 
           const Spacer(),
@@ -425,7 +603,6 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 32),
           Text(
                 'Choose the first habit that you\'d like to build',
                 style: AppTypography.headlineLarge.copyWith(
@@ -448,24 +625,6 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
                     int index = entry.key;
                     Map<String, dynamic> habit = entry.value;
                     bool isSelected = selectedHabit == habit['title'];
-
-                    // Map habit titles to appropriate Flutter icons
-                    IconData getHabitIcon(String title) {
-                      switch (title.toLowerCase()) {
-                        case 'sleep over 8h':
-                          return Icons.bedtime;
-                        case 'have a healthy meal':
-                          return Icons.restaurant;
-                        case 'drink 8 cups of water':
-                          return Icons.water_drop;
-                        case 'workout':
-                          return Icons.fitness_center;
-                        case 'walking':
-                          return Icons.directions_walk;
-                        default:
-                          return Icons.check_circle_outline;
-                      }
-                    }
 
                     return Container(
                           margin: const EdgeInsets.only(bottom: 16),
@@ -504,10 +663,12 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
                                           .withOpacity(0.2),
                                       borderRadius: BorderRadius.circular(16),
                                     ),
-                                    child: Icon(
-                                      getHabitIcon(habit['title']),
-                                      color: habit['color'] as Color,
-                                      size: 28,
+                                    child: Center(
+                                      child: FaIcon(
+                                        habit['icon'] as IconData,
+                                        color: habit['color'] as Color,
+                                        size: 28,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 20),
@@ -611,19 +772,37 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
                         ),
                         child: Row(
                           children: [
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                color: Colors.grey.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Icon(
-                                Icons.edit,
-                                color: isDark
-                                    ? Colors.white70
-                                    : Colors.grey.shade600,
-                                size: 24,
+                            GestureDetector(
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                showIconLibraryBottomSheet(
+                                  context,
+                                  selectedIcon: customHabitIcon,
+                                  onIconSelected: (icon) {
+                                    setState(() {
+                                      customHabitIcon = icon;
+                                      selectedHabit = null;
+                                    });
+                                  },
+                                  isDark: isDark,
+                                );
+                              },
+                              child: Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Center(
+                                  child: FaIcon(
+                                    customHabitIcon,
+                                    color: isDark
+                                        ? Colors.white70
+                                        : Colors.grey.shade600,
+                                    size: 24,
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 20),
@@ -659,57 +838,6 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
                       .slideY(begin: 1, duration: 600.ms, delay: 1000.ms)
                       .fadeIn(duration: 600.ms, delay: 1000.ms),
 
-                  const SizedBox(height: 32),
-
-                  // Bottom buttons
-                  Row(
-                        children: [
-                          Expanded(
-                            child: SizedBox(
-                              height: 56,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: isDark
-                                      ? darkSurface
-                                      : Colors.grey.shade200,
-                                  foregroundColor: isDark
-                                      ? Colors.white70
-                                      : Colors.black87,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                                onPressed: () {
-                                  HapticFeedback.selectionClick();
-                                  print('Skip pressed');
-                                },
-                                child: Text(
-                                  'SKIP',
-                                  style: AppTypography.labelMedium.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            flex: 2,
-                            child: primaryButton(
-                              text: "Complete",
-                              height: 56,
-                              onPressed: nextPage,
-                              isDisabled:
-                                  selectedHabit == null && customHabit.isEmpty,
-                            ),
-                          ),
-                        ],
-                      )
-                      .animate()
-                      .slideY(begin: 1, duration: 800.ms, delay: 1200.ms)
-                      .fadeIn(duration: 800.ms, delay: 1200.ms),
-
                   const SizedBox(height: 24),
                 ],
               ),
@@ -726,15 +854,10 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
     required Function(int) onHourChanged,
     required Function(int) onMinuteChanged,
     required bool isDark,
+    required BuildContext context,
   }) {
-    return Container(
-          height: 240,
-          decoration: BoxDecoration(
-            color: isDark
-                ? darkSurface.withOpacity(0.5)
-                : lightGrey.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(20),
-          ),
+    return SizedBox(
+          height: 0.22 * MediaQuery.of(context).size.height,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -746,6 +869,7 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
                   ),
                   itemExtent: 60,
                   squeeze: 1.1,
+                  looping: true,
                   diameterRatio: 1.5,
                   onSelectedItemChanged: onHourChanged,
                   children: List.generate(24, (index) {
@@ -780,6 +904,7 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
                   itemExtent: 60,
                   squeeze: 1.1,
                   diameterRatio: 1.5,
+                  looping: true,
                   onSelectedItemChanged: onMinuteChanged,
                   children: List.generate(60, (index) {
                     return Center(
@@ -799,5 +924,175 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
         .animate()
         .scale(begin: const Offset(0.9, 0.9), duration: 800.ms, delay: 600.ms)
         .fadeIn(duration: 800.ms, delay: 600.ms);
+  }
+
+  Widget _buildGoalSettingPage(bool isDark) {
+    final habitData = _getSelectedHabitData();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Habit name and icon at the top
+          Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: green.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: FaIcon(
+                        habitData['icon'] as IconData,
+                        color: green,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      habitData['name'],
+                      style: AppTypography.cardTitle.copyWith(
+                        color: isDark ? Colors.white : darkGreen,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+              .animate()
+              .slideY(begin: -1, duration: 800.ms, delay: 200.ms)
+              .fadeIn(duration: 800.ms, delay: 200.ms),
+
+          const SizedBox(height: 40),
+
+          Text(
+                'Set a daily goal',
+                style: AppTypography.headlineLarge.copyWith(
+                  color: isDark ? Colors.white : darkGreen,
+                ),
+              )
+              .animate()
+              .slideY(begin: 1, duration: 800.ms, delay: 400.ms)
+              .fadeIn(duration: 800.ms, delay: 400.ms),
+
+          const SizedBox(height: 32),
+
+          SizedBox(
+                height: MediaQuery.of(context).size.height * 0.3,
+                child: CupertinoPicker(
+                  scrollController: FixedExtentScrollController(
+                    initialItem: goalValue - 1, // Convert to 0-based index
+                  ),
+                  itemExtent: 50,
+                  squeeze: 1.5,
+                  diameterRatio: 1.4,
+                  onSelectedItemChanged: (index) {
+                    setState(() {
+                      goalValue = index + 1; // Convert back to 1-based value
+                    });
+                    HapticFeedback.selectionClick();
+                  },
+                  magnification: 1,
+                  looping: true,
+                  useMagnifier: true,
+                  // selectionOverlay: Container(
+                  //   // height: 30,
+                  //   // width: 30,
+                  //   decoration: BoxDecoration(
+                  //     border: Border(
+                  //       top: BorderSide(
+                  //         color: isDark ? Colors.white : darkGreen,
+                  //         width: 1.2,
+                  //       ),
+                  //       bottom: BorderSide(
+                  //         color: isDark ? Colors.white : darkGreen,
+                  //         width: 1.2,
+                  //       ),
+                  //     ),
+                  //   ),
+                  // ),
+                  children: List.generate(
+                    120, // Max 120 minutes
+                    (index) {
+                      return Center(
+                        child: Text(
+                          '${index + 1}',
+                          style: AppTypography.cardTitle.copyWith(
+                            color: isDark ? Colors.white : darkGreen,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              )
+              .animate()
+              .scale(
+                begin: const Offset(0.9, 0.9),
+                duration: 800.ms,
+                delay: 600.ms,
+              )
+              .fadeIn(duration: 800.ms, delay: 600.ms),
+
+          const Spacer(),
+
+          // Skip and Finish buttons
+          Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _completeOnboarding();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isDark
+                                ? Colors.grey.shade600
+                                : Colors.grey.shade300,
+                            width: 1,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Skip',
+                            style: AppTypography.bodyLarge.copyWith(
+                              color: isDark
+                                  ? Colors.white70
+                                  : Colors.grey.shade600,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 2,
+                    child: primaryButton(
+                      text: "Finish",
+                      onPressed: _completeOnboarding,
+                    ),
+                  ),
+                ],
+              )
+              .animate()
+              .slideY(begin: 1, duration: 800.ms, delay: 1000.ms)
+              .fadeIn(duration: 800.ms, delay: 1000.ms),
+        ],
+      ),
+    );
   }
 }

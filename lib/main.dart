@@ -3,9 +3,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:streakly/controllers/theme_controller.dart';
+import 'package:streakly/pages/main_wrapper.dart';
 import 'package:streakly/pages/onboarding/page.dart';
 import 'package:streakly/services/notification_service.dart';
-import 'package:streakly/pages/home_page.dart';
+import 'package:streakly/theme/app_theme.dart';
 import 'package:streakly/utils/habit_data_migration.dart';
 
 void main() async {
@@ -16,28 +18,32 @@ void main() async {
 
   // Initialize notification services
   await NotificationService.initialize();
-  await NotificationManager.initialize();
-  await NotificationManager.setupIsolateListener();
+  // await NotificationManager.initialize();
+  // await NotificationManager.setupIsolateListener();
 
   runApp(
     DevicePreview(
-      enabled: false,
-      builder: (context) => ProviderScope(child: MainApp()), // Wrap your app
+      enabled: true, // Only enable in debug mode
+      builder: (context) => ProviderScope(child: MainApp()),
     ),
   );
 }
 
-class MainApp extends StatelessWidget {
+class MainApp extends ConsumerWidget {
   const MainApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeControllerProvider);
+
     return MaterialApp(
       title: 'Streakly - Habit Tracker',
-      useInheritedMediaQuery: true,
       locale: DevicePreview.locale(context),
       builder: DevicePreview.appBuilder,
-
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
+      routes: {'/home': (context) => const MainWrapper()},
       home: const OnBoardingPage(),
       debugShowCheckedModeBanner: false,
     );

@@ -157,7 +157,7 @@ class OnBoardingPage extends StatelessWidget {
                       primaryButton(
                             text: "Get Started",
                             onPressed: () {
-                              Navigator.of(context).push(
+                              Navigator.of(context).pushReplacement(
                                 MaterialPageRoute(
                                   builder: (context) => OnBoardingPages(),
                                 ),

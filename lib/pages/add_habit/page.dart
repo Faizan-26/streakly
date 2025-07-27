@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:streakly/model/habit_model.dart';
 import 'package:streakly/theme/app_colors.dart';
 import 'package:streakly/theme/app_typography.dart';
@@ -9,15 +10,16 @@ import 'package:streakly/types/habit_frequency_types.dart';
 import 'package:streakly/types/habit_type.dart';
 import 'package:streakly/types/time_of_day_type.dart';
 import 'package:streakly/widgets/icon_library_bottomsheet.dart';
+import 'package:streakly/controllers/habit_controller.dart';
 
-class AddHabitPage extends StatefulWidget {
+class AddHabitPage extends ConsumerStatefulWidget {
   const AddHabitPage({super.key});
 
   @override
-  State<AddHabitPage> createState() => _AddHabitPageState();
+  ConsumerState<AddHabitPage> createState() => _AddHabitPageState();
 }
 
-class _AddHabitPageState extends State<AddHabitPage> {
+class _AddHabitPageState extends ConsumerState<AddHabitPage> {
   final PageController _pageController = PageController();
   int _currentStep = 0;
   final int _totalSteps = 6;
@@ -143,7 +145,7 @@ class _AddHabitPageState extends State<AddHabitPage> {
     }
   }
 
-  void _saveHabit() {
+  void _saveHabit() async {
     HapticFeedback.heavyImpact();
 
     if (_titleController.text.isEmpty) {
@@ -178,8 +180,19 @@ class _AddHabitPageState extends State<AddHabitPage> {
       isPreset: false,
     );
 
-    // TODO: Save habit to your data store
-    Navigator.pop(context, habit);
+    try {
+      // Save habit using the controller
+      await ref.read(habitControllerProvider.notifier).addHabit(habit);
+
+      // Show success message
+      _showSnackBar('Habit created successfully!');
+
+      // Return to previous screen
+      Navigator.pop(context, habit);
+    } catch (e) {
+      // Show error message
+      _showSnackBar('Failed to create habit: $e');
+    }
   }
 
   void _showSnackBar(String message) {

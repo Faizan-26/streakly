@@ -4,6 +4,8 @@ import 'package:streakly/model/streak_entry.dart';
 import 'package:streakly/controllers/habit_repository.dart';
 import 'package:streakly/services/notification_service.dart';
 import 'package:streakly/types/habit_type.dart';
+import 'package:streakly/types/time_of_day_type.dart';
+import 'package:streakly/types/habit_frequency_types.dart';
 import 'package:flutter/material.dart';
 
 /// State class for habit management
@@ -126,6 +128,80 @@ class HabitState {
     return date1.year == date2.year &&
         date1.month == date2.month &&
         date1.day == date2.day;
+  }
+
+  /// Get habits filtered by time of day preference
+  List<Habit> getHabitsByTimeOfDay(TimeOfDayPreference timeOfDay) {
+    if (timeOfDay == TimeOfDayPreference.anytime) {
+      // Return all habits when filtering by anytime
+      return habits;
+    }
+    return habits.where((habit) => habit.timeOfDay == timeOfDay).toList();
+  }
+
+  /// Get habits due on a specific day of the week (0 = Sunday, 6 = Saturday)
+  List<Habit> getHabitsByDayOfWeek(int dayOfWeek) {
+    return habits.where((habit) {
+      // Check if habit is due on this day based on its frequency
+      switch (habit.frequency.type) {
+        case FrequencyType.daily:
+          return true; // Daily habits are due every day
+        case FrequencyType.weekly:
+          return habit.frequency.selectedDays?.contains(dayOfWeek) ?? false;
+        case FrequencyType.monthly:
+        case FrequencyType.yearly:
+        case FrequencyType.longTerm:
+          // For these types, we need to check if the specific date matches
+          final now = DateTime.now();
+          return NotificationService.isHabitDueOnDate(habit, now);
+      }
+    }).toList();
+  }
+
+  /// Get habits filtered by both day of week and time of day
+  List<Habit> getHabitsForDayAndTime(
+    int dayOfWeek,
+    TimeOfDayPreference timeOfDay,
+  ) {
+    final habitsForDay = getHabitsByDayOfWeek(dayOfWeek);
+
+    if (timeOfDay == TimeOfDayPreference.anytime) {
+      return habitsForDay;
+    }
+
+    return habitsForDay.where((habit) => habit.timeOfDay == timeOfDay).toList();
+  }
+
+  /// Get habits for today filtered by time of day
+  List<Habit> getTodaysHabitsByTimeOfDay(TimeOfDayPreference timeOfDay) {
+    final today = DateTime.now();
+    final todaysHabits = habits.where((habit) {
+      return NotificationService.isHabitDueOnDate(habit, today);
+    }).toList();
+
+    if (timeOfDay == TimeOfDayPreference.anytime) {
+      return todaysHabits;
+    }
+
+    return todaysHabits.where((habit) => habit.timeOfDay == timeOfDay).toList();
+  }
+
+  /// Get habits grouped by time of day for today
+  Map<TimeOfDayPreference, List<Habit>> getTodaysHabitsGroupedByTime() {
+    final todaysHabits = getTodaysDueHabits();
+    final Map<TimeOfDayPreference, List<Habit>> grouped = {};
+
+    for (final timeOfDay in TimeOfDayPreference.values) {
+      if (timeOfDay == TimeOfDayPreference.anytime) {
+        grouped[timeOfDay] = todaysHabits;
+      } else {
+        grouped[timeOfDay] = todaysHabits
+            .where((habit) => habit.timeOfDay == timeOfDay)
+            .toList();
+      }
+    }
+
+    return grouped;
   }
 }
 
@@ -536,4 +612,63 @@ final negativeHabitsProvider = Provider<List<Habit>>((ref) {
 
 final oneTimeHabitsProvider = Provider<List<Habit>>((ref) {
   return ref.watch(habitControllerProvider).getHabitsByType(HabitType.oneTime);
+});
+
+/// Provider for habits filtered by time of day
+final habitsForTimeOfDayProvider =
+    Provider.family<List<Habit>, TimeOfDayPreference>((ref, timeOfDay) {
+      return ref.watch(habitControllerProvider).getHabitsByTimeOfDay(timeOfDay);
+    });
+
+/// Provider for habits due on a specific day of the week
+final habitsForDayOfWeekProvider = Provider.family<List<Habit>, int>((
+  ref,
+  dayOfWeek,
+) {
+  return ref.watch(habitControllerProvider).getHabitsByDayOfWeek(dayOfWeek);
+});
+
+/// Provider for habits filtered by both day and time
+final habitsForDayAndTimeProvider =
+    Provider.family<
+      List<Habit>,
+      ({int dayOfWeek, TimeOfDayPreference timeOfDay})
+    >((ref, params) {
+      return ref
+          .watch(habitControllerProvider)
+          .getHabitsForDayAndTime(params.dayOfWeek, params.timeOfDay);
+    });
+
+/// Provider for today's habits filtered by time of day
+final todaysHabitsByTimeProvider =
+    Provider.family<List<Habit>, TimeOfDayPreference>((ref, timeOfDay) {
+      return ref
+          .watch(habitControllerProvider)
+          .getTodaysHabitsByTimeOfDay(timeOfDay);
+    });
+
+/// Provider for today's habits grouped by time of day
+final todaysHabitsGroupedProvider =
+    Provider<Map<TimeOfDayPreference, List<Habit>>>((ref) {
+      return ref.watch(habitControllerProvider).getTodaysHabitsGroupedByTime();
+    });
+
+/// Provider for morning habits today
+final morningHabitsProvider = Provider<List<Habit>>((ref) {
+  return ref.watch(todaysHabitsByTimeProvider(TimeOfDayPreference.morning));
+});
+
+/// Provider for afternoon habits today
+final afternoonHabitsProvider = Provider<List<Habit>>((ref) {
+  return ref.watch(todaysHabitsByTimeProvider(TimeOfDayPreference.afternoon));
+});
+
+/// Provider for evening habits today
+final eveningHabitsProvider = Provider<List<Habit>>((ref) {
+  return ref.watch(todaysHabitsByTimeProvider(TimeOfDayPreference.evening));
+});
+
+/// Provider for anytime habits today
+final anytimeHabitsProvider = Provider<List<Habit>>((ref) {
+  return ref.watch(todaysHabitsByTimeProvider(TimeOfDayPreference.anytime));
 });

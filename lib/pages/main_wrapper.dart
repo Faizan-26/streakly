@@ -37,10 +37,19 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
       context,
       MaterialPageRoute(builder: (context) => const AddHabitPage()),
     ).then((result) {
-      // Handle the returned habit if needed
+      // The habit is already saved in AddHabitPage using the controller
       if (result != null) {
-        // TODO: Save the habit to your data store
-        print('New habit created: ${result.title}');
+        // Show confirmation or refresh data if needed
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Habit "${result.title}" created successfully!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
       }
     });
   }

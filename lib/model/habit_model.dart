@@ -19,7 +19,7 @@ class Habit {
   final Color color;
   final IconData icon;
   final String? category;
-  final bool isPreset;
+  final bool isPreset; // isPresent indicates if this habit is a preset habit
 
   Habit({
     required this.id,

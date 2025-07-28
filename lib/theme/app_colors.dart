@@ -9,3 +9,12 @@ final Color darkGreen = Color.fromARGB(255, 1, 54, 46);
 const Color darkBackground = Color(0xFF1A1B2E);
 const Color darkSurface = Color(0xFF2A2D3F);
 const Color darkCard = Color(0xFF353A52);
+
+final Color lightGreen = Color.fromARGB(255, 200, 240, 180);
+final Color accentOrange = Color.fromARGB(
+  255,
+  255,
+  176,
+  59,
+); // For streaks/achievements
+final Color softWhite = Color.fromARGB(255, 252, 253, 255);

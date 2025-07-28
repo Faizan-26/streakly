@@ -6,6 +6,7 @@ import 'package:streakly/pages/home/page.dart';
 import 'package:streakly/pages/ai_agent/page.dart';
 import 'package:streakly/pages/stats/page.dart';
 import 'package:streakly/pages/profile/page.dart';
+import 'package:streakly/pages/add_habit/page.dart';
 
 class MainWrapper extends ConsumerStatefulWidget {
   const MainWrapper({super.key});
@@ -31,8 +32,17 @@ class _MainWrapperState extends ConsumerState<MainWrapper> {
   }
 
   void _handleFabClick() {
-    // Handle FAB click - e.g., show add habit dialog/page
-    print('FAB clicked - Add new habit');
+    // Navigate to Add Habit page
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddHabitPage()),
+    ).then((result) {
+      // Handle the returned habit if needed
+      if (result != null) {
+        // TODO: Save the habit to your data store
+        print('New habit created: ${result.title}');
+      }
+    });
   }
 
   @override

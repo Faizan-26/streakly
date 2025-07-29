@@ -20,6 +20,7 @@ class Habit {
   final IconData icon;
   final String? category;
   final bool isPreset; // isPresent indicates if this habit is a preset habit
+  final DateTime createdAt;
 
   Habit({
     required this.id,
@@ -35,6 +36,7 @@ class Habit {
     this.reminderTime,
     required this.color,
     required this.icon,
+    required this.createdAt,
     this.category,
     this.isPreset = false,
   });
@@ -73,6 +75,7 @@ class Habit {
       ),
       category: map['category'] as String?,
       isPreset: map['isPreset'] as bool,
+      createdAt: DateTime.parse(map['createdAt'] as String),
     );
   }
 
@@ -96,6 +99,7 @@ class Habit {
       'iconFontPackage': icon.fontPackage,
       'category': category,
       'isPreset': isPreset,
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 }

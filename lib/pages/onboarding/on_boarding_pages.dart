@@ -172,6 +172,7 @@ class _OnBoardingPagesState extends ConsumerState<OnBoardingPages> {
         category: selectedCategories.isNotEmpty
             ? selectedCategories.first
             : null,
+        createdAt: DateTime.now(),
       );
 
       // Add habit to controller

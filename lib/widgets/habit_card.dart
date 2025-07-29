@@ -11,9 +11,12 @@ class HabitCard extends StatelessWidget {
   final bool isDark;
   final int index;
   final bool isExpanded;
+  final DateTime selectedDate;
   final VoidCallback onTap;
   final VoidCallback? onStartGoal;
   final VoidCallback? onFinishGoal;
+  final VoidCallback? onEditHabit;
+  final VoidCallback? onDeleteHabit;
 
   const HabitCard({
     super.key,
@@ -22,14 +25,20 @@ class HabitCard extends StatelessWidget {
     required this.isDark,
     required this.index,
     required this.isExpanded,
+    required this.selectedDate,
     required this.onTap,
     this.onStartGoal,
     this.onFinishGoal,
+    this.onEditHabit,
+    this.onDeleteHabit,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isCompleted = habitState.isHabitCompletedToday(habit.id);
+    final isCompleted = habitState.isHabitCompletedOnDate(
+      habit.id,
+      selectedDate,
+    );
     final streakCount = habitState.getStreakCount(habit.id);
     final hasGoal = habit.goalDuration != null || habit.goalCount != null;
     final screenWidth = MediaQuery.of(context).size.width;
@@ -141,62 +150,85 @@ class HabitCard extends StatelessWidget {
                           ),
                         ),
 
-                        // Completion check and streak
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                        // Completion check and streak with menu
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Completion indicator
-                            Container(
-                              width: screenWidth < 375 ? 24 : 28,
-                              height: screenWidth < 375 ? 24 : 28,
-                              decoration: BoxDecoration(
-                                color: isCompleted
-                                    ? habit.color
-                                    : (isDark
-                                          ? Colors.grey.shade700
-                                          : Colors.grey.shade200),
-                                borderRadius: BorderRadius.circular(
-                                  screenWidth < 375 ? 8 : 10,
-                                ),
-                                border: Border.all(
-                                  color: isCompleted
-                                      ? habit.color
-                                      : (isDark
-                                            ? Colors.grey.shade600
-                                            : Colors.grey.shade300),
-                                  width: 1,
+                            // Three-dot menu
+                            GestureDetector(
+                              onTap: () => _showHabitMenu(context),
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  Icons.more_vert,
+                                  color: isDark
+                                      ? Colors.white60
+                                      : Colors.grey.shade600,
+                                  size: screenWidth < 375 ? 16 : 18,
                                 ),
                               ),
-                              child: isCompleted
-                                  ? Icon(
-                                      Icons.check,
-                                      color: Colors.white,
-                                      size: screenWidth < 375 ? 14 : 16,
-                                    )
-                                  : null,
                             ),
-                            if (streakCount > 0) ...[
-                              SizedBox(height: screenWidth < 375 ? 4 : 6),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.local_fire_department,
-                                    color: habit.color,
-                                    size: screenWidth < 375 ? 12 : 14,
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    '$streakCount',
-                                    style: AppTypography.labelSmall.copyWith(
-                                      color: habit.color,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: screenWidth < 375 ? 10 : 11,
+                            const SizedBox(width: 8),
+                            // Completion indicator
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Container(
+                                  width: screenWidth < 375 ? 24 : 28,
+                                  height: screenWidth < 375 ? 24 : 28,
+                                  decoration: BoxDecoration(
+                                    color: isCompleted
+                                        ? habit.color
+                                        : (isDark
+                                              ? Colors.grey.shade700
+                                              : Colors.grey.shade200),
+                                    borderRadius: BorderRadius.circular(
+                                      screenWidth < 375 ? 8 : 10,
+                                    ),
+                                    border: Border.all(
+                                      color: isCompleted
+                                          ? habit.color
+                                          : (isDark
+                                                ? Colors.grey.shade600
+                                                : Colors.grey.shade300),
+                                      width: 1,
                                     ),
                                   ),
+                                  child: isCompleted
+                                      ? Icon(
+                                          Icons.check,
+                                          color: Colors.white,
+                                          size: screenWidth < 375 ? 14 : 16,
+                                        )
+                                      : null,
+                                ),
+                                if (streakCount > 0) ...[
+                                  SizedBox(height: screenWidth < 375 ? 4 : 6),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.local_fire_department,
+                                        color: habit.color,
+                                        size: screenWidth < 375 ? 12 : 14,
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        '$streakCount',
+                                        style: AppTypography.labelSmall
+                                            .copyWith(
+                                              color: habit.color,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: screenWidth < 375
+                                                  ? 10
+                                                  : 11,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
                                 ],
-                              ),
-                            ],
+                              ],
+                            ),
                           ],
                         ),
                       ],
@@ -367,5 +399,110 @@ class HabitCard extends StatelessWidget {
       case TimeOfDayPreference.anytime:
         return Icons.schedule_outlined;
     }
+  }
+
+  void _showHabitMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white24 : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: Icon(
+                Icons.edit,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+              title: Text(
+                'Edit Habit',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                if (onEditHabit != null) {
+                  onEditHabit!();
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text(
+                'Delete Habit',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeleteConfirmation(context);
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        title: Text(
+          'Delete Habit',
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete "${habit.title}"? This action cannot be undone.',
+          style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.grey.shade600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              if (onDeleteHabit != null) {
+                onDeleteHabit!();
+              }
+            },
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

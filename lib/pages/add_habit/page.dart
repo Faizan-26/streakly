@@ -31,13 +31,14 @@ class _AddHabitPageState extends ConsumerState<AddHabitPage> {
 
   HabitType _selectedType = HabitType.regular;
   FrequencyType _selectedFrequency = FrequencyType.daily;
-  TimeOfDayPreference? _selectedTimeOfDay;
+  TimeOfDayPreference _selectedTimeOfDay =
+      TimeOfDayPreference.anytime; // Default to anytime
   Duration? _goalDuration;
   final List<int> _selectedDays = [];
   int? _timesPerPeriod;
   final List<int> _specificDates = [];
   bool _hasReminder = false;
-  TimeOfDay? _reminderTime;
+  final List<TimeOfDay> _reminderTimes = []; // Multiple reminder times
   Color _selectedColor = green;
   IconData _selectedIcon = Icons.star;
   DateTime? _startDate;
@@ -122,8 +123,8 @@ class _AddHabitPageState extends ConsumerState<AddHabitPage> {
       case 4: // Customization - always valid since we have defaults
         return true;
       case 5: // Reminders
-        if (_hasReminder && _reminderTime == null) {
-          _showSnackBar('Please set a reminder time');
+        if (_hasReminder && _reminderTimes.isEmpty) {
+          _showSnackBar('Please set at least one reminder time');
           return false;
         }
         return true;
@@ -171,13 +172,14 @@ class _AddHabitPageState extends ConsumerState<AddHabitPage> {
       startDate: _startDate ?? DateTime.now(),
       endDate: _endDate,
       hasReminder: _hasReminder,
-      reminderTime: _reminderTime,
+      reminderTime: _reminderTimes.isNotEmpty ? _reminderTimes.first : null,
       color: _selectedColor,
       icon: _selectedIcon,
       category: _categoryController.text.isNotEmpty
           ? _categoryController.text
           : null,
       isPreset: false,
+      createdAt: DateTime.now(),
     );
 
     try {
@@ -530,7 +532,7 @@ class _AddHabitPageState extends ConsumerState<AddHabitPage> {
                 onTap: () {
                   HapticFeedback.selectionClick();
                   setState(() {
-                    _selectedTimeOfDay = isSelected ? null : timeOfDay;
+                    _selectedTimeOfDay = timeOfDay;
                   });
                 },
                 isDark: isDark,
@@ -1450,57 +1452,114 @@ class _AddHabitPageState extends ConsumerState<AddHabitPage> {
         const SizedBox(height: 16),
         Material(
           color: Colors.transparent,
-          child: InkWell(
-            onTap: () async {
-              HapticFeedback.lightImpact();
-              _showIOSTimePicker(isDark);
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isDark ? darkCard : lightGrey,
+          child: Column(
+            children: [
+              // Add reminder button
+              InkWell(
+                onTap: () async {
+                  HapticFeedback.lightImpact();
+                  _showIOSTimePicker(isDark);
+                },
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _reminderTime != null
-                      ? _selectedColor.withOpacity(0.3)
-                      : Colors.transparent,
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.access_time_rounded,
-                    color: _reminderTime != null
-                        ? _selectedColor
-                        : (isDark ? Colors.white38 : Colors.grey.shade500),
-                    size: 24,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      _reminderTime != null
-                          ? _reminderTime!.format(context)
-                          : 'Select time',
-                      style: AppTypography.bodyLarge.copyWith(
-                        color: _reminderTime != null
-                            ? (isDark ? Colors.white : darkGreen)
-                            : (isDark ? Colors.white38 : Colors.grey.shade500),
-                        fontWeight: _reminderTime != null
-                            ? FontWeight.w600
-                            : FontWeight.w500,
-                      ),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark ? darkCard : lightGrey,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _reminderTimes.isNotEmpty
+                          ? _selectedColor.withOpacity(0.3)
+                          : Colors.transparent,
+                      width: 1,
                     ),
                   ),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    color: isDark ? Colors.white38 : Colors.grey.shade400,
-                    size: 16,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.add_circle_outline,
+                        color: _selectedColor,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          _reminderTimes.isEmpty
+                              ? 'Add reminder time'
+                              : 'Add another reminder',
+                          style: AppTypography.bodyLarge.copyWith(
+                            color: _selectedColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: isDark ? Colors.white38 : Colors.grey.shade400,
+                        size: 16,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+
+              // Display added reminder times
+              if (_reminderTimes.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                ...(_reminderTimes.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final time = entry.value;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: _selectedColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _selectedColor.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.access_time_rounded,
+                              color: _selectedColor,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                time.format(context),
+                                style: AppTypography.bodyMedium.copyWith(
+                                  color: isDark ? Colors.white : darkGreen,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                setState(() {
+                                  _reminderTimes.removeAt(index);
+                                });
+                              },
+                              icon: Icon(
+                                Icons.close,
+                                color: _selectedColor,
+                                size: 20,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList()),
+              ],
+            ],
           ),
         ),
       ],
@@ -1508,105 +1567,117 @@ class _AddHabitPageState extends ConsumerState<AddHabitPage> {
   }
 
   void _showIOSTimePicker(bool isDark) {
-    TimeOfDay? tempTime = _reminderTime ?? const TimeOfDay(hour: 9, minute: 0);
+    TimeOfDay tempTime = const TimeOfDay(hour: 9, minute: 0);
 
     showCupertinoModalPopup(
       context: context,
-      builder: (context) => Container(
-        height: 350,
-        decoration: BoxDecoration(
-          color: isDark ? darkCard : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[600] : Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+      builder: (context) => Material(
+        child: Container(
+          height: 350,
+          decoration: BoxDecoration(
+            color: isDark ? darkCard : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[600] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
 
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  CupertinoButton(
-                    child: Text(
-                      'Cancel',
-                      style: TextStyle(
-                        color: isDark ? Colors.white70 : Colors.grey.shade600,
-                        fontSize: 16,
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    CupertinoButton(
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : Colors.grey.shade600,
+                          fontSize: 16,
+                        ),
                       ),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  Text(
-                    'Reminder Time',
-                    style: AppTypography.titleMedium.copyWith(
-                      color: isDark ? Colors.white : darkGreen,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  CupertinoButton(
-                    child: Text(
-                      'Done',
-                      style: TextStyle(
-                        color: _selectedColor,
-                        fontSize: 16,
+                    Text(
+                      'Add Reminder',
+                      style: AppTypography.titleMedium.copyWith(
+                        color: isDark ? Colors.white : darkGreen,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _reminderTime = tempTime;
-                      });
-                      Navigator.pop(context);
-                    },
-                  ),
-                ],
+                    CupertinoButton(
+                      child: Text(
+                        'Add',
+                        style: TextStyle(
+                          color: _selectedColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          if (!_reminderTimes.contains(tempTime)) {
+                            _reminderTimes.add(tempTime);
+                            _reminderTimes.sort((a, b) {
+                              final aMinutes = a.hour * 60 + a.minute;
+                              final bMinutes = b.hour * 60 + b.minute;
+                              return aMinutes.compareTo(bMinutes);
+                            });
+                          }
+                        });
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            // Time picker
-            Expanded(
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  cupertinoOverrideTheme: CupertinoThemeData(
-                    brightness: isDark ? Brightness.dark : Brightness.light,
-                    textTheme: CupertinoTextThemeData(
-                      dateTimePickerTextStyle: TextStyle(
-                        color: isDark ? Colors.white : Colors.black,
-                        fontSize: 22,
+              // Time picker
+              Expanded(
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    cupertinoOverrideTheme: CupertinoThemeData(
+                      brightness: isDark ? Brightness.dark : Brightness.light,
+                      textTheme: CupertinoTextThemeData(
+                        dateTimePickerTextStyle: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                          fontSize: 22,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                child: CupertinoDatePicker(
-                  mode: CupertinoDatePickerMode.time,
-                  initialDateTime: DateTime(
-                    2024,
-                    1,
-                    1,
-                    tempTime?.hour ?? 9,
-                    tempTime?.minute ?? 0,
+                  child: CupertinoDatePicker(
+                    mode: CupertinoDatePickerMode.time,
+                    initialDateTime: DateTime(
+                      2024,
+                      1,
+                      1,
+                      tempTime.hour,
+                      tempTime.minute,
+                    ),
+                    onDateTimeChanged: (dateTime) {
+                      tempTime = TimeOfDay(
+                        hour: dateTime.hour,
+                        minute: dateTime.minute,
+                      );
+                    },
                   ),
-                  onDateTimeChanged: (dateTime) {
-                    tempTime = TimeOfDay(
-                      hour: dateTime.hour,
-                      minute: dateTime.minute,
-                    );
-                  },
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -2024,94 +2095,96 @@ class _AddHabitPageState extends ConsumerState<AddHabitPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: 300,
-        decoration: BoxDecoration(
-          color: isDark ? darkCard : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton(
-                    child: Text(
-                      'Cancel',
-                      style: TextStyle(
-                        color: isDark ? Colors.white70 : Colors.grey.shade600,
+      builder: (context) => Material(
+        child: Container(
+          height: 300,
+          decoration: BoxDecoration(
+            color: isDark ? darkCard : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : Colors.grey.shade600,
+                        ),
                       ),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  Text(
-                    'Goal Count',
-                    style: AppTypography.titleMedium.copyWith(
-                      color: isDark ? Colors.white : darkGreen,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  TextButton(
-                    child: Text(
-                      'Done',
-                      style: TextStyle(
-                        color: _selectedColor,
+                    Text(
+                      'Goal Count',
+                      style: AppTypography.titleMedium.copyWith(
+                        color: isDark ? Colors.white : darkGreen,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _goalCountController.text = tempCount.toString();
-                      });
-                      Navigator.pop(context);
-                    },
-                  ),
-                ],
+                    TextButton(
+                      child: Text(
+                        'Done',
+                        style: TextStyle(
+                          color: _selectedColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _goalCountController.text = tempCount.toString();
+                        });
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            // Count picker
-            Expanded(
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  cupertinoOverrideTheme: CupertinoThemeData(
-                    brightness: isDark ? Brightness.dark : Brightness.light,
-                    textTheme: CupertinoTextThemeData(
-                      pickerTextStyle: TextStyle(
-                        color: isDark ? Colors.white : Colors.black,
-                        fontSize: 22,
+              // Count picker
+              Expanded(
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    cupertinoOverrideTheme: CupertinoThemeData(
+                      brightness: isDark ? Brightness.dark : Brightness.light,
+                      textTheme: CupertinoTextThemeData(
+                        pickerTextStyle: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                          fontSize: 22,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                child: CupertinoPicker(
-                  itemExtent: 40,
-                  scrollController: FixedExtentScrollController(
-                    initialItem: currentCount - 1,
-                  ),
-                  onSelectedItemChanged: (index) {
-                    tempCount = index + 1;
-                    HapticFeedback.selectionClick();
-                  },
-                  children: List.generate(
-                    100,
-                    (index) => Center(
-                      child: Text(
-                        '${index + 1}',
-                        style: TextStyle(
-                          fontSize: 22,
-                          color: isDark ? Colors.white : Colors.black,
+                  child: CupertinoPicker(
+                    itemExtent: 40,
+                    scrollController: FixedExtentScrollController(
+                      initialItem: currentCount - 1,
+                    ),
+                    onSelectedItemChanged: (index) {
+                      tempCount = index + 1;
+                      HapticFeedback.selectionClick();
+                    },
+                    children: List.generate(
+                      100,
+                      (index) => Center(
+                        child: Text(
+                          '${index + 1}',
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -2124,181 +2197,187 @@ class _AddHabitPageState extends ConsumerState<AddHabitPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: 300,
-        decoration: BoxDecoration(
-          color: isDark ? darkCard : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton(
-                    child: Text(
-                      'Cancel',
-                      style: TextStyle(
-                        color: isDark ? Colors.white70 : Colors.grey.shade600,
+      builder: (context) => Material(
+        child: Container(
+          height: 300,
+          decoration: BoxDecoration(
+            color: isDark ? darkCard : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : Colors.grey.shade600,
+                        ),
                       ),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  Text(
-                    'Duration Goal',
-                    style: AppTypography.titleMedium.copyWith(
-                      color: isDark ? Colors.white : darkGreen,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  TextButton(
-                    child: Text(
-                      'Done',
-                      style: TextStyle(
-                        color: _selectedColor,
+                    Text(
+                      'Duration Goal',
+                      style: AppTypography.titleMedium.copyWith(
+                        color: isDark ? Colors.white : darkGreen,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _goalDuration = Duration(
-                          hours: tempHours,
-                          minutes: tempMinutes,
-                        );
-                      });
-                      Navigator.pop(context);
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // Duration pickers (hours and minutes)
-            Expanded(
-              child: Row(
-                children: [
-                  // Hours picker
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          'Hours',
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: isDark
-                                ? Colors.white70
-                                : Colors.grey.shade600,
-                          ),
+                    TextButton(
+                      child: Text(
+                        'Done',
+                        style: TextStyle(
+                          color: _selectedColor,
+                          fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: Theme(
-                            data: Theme.of(context).copyWith(
-                              cupertinoOverrideTheme: CupertinoThemeData(
-                                brightness: isDark
-                                    ? Brightness.dark
-                                    : Brightness.light,
-                                textTheme: CupertinoTextThemeData(
-                                  pickerTextStyle: TextStyle(
-                                    color: isDark ? Colors.white : Colors.black,
-                                    fontSize: 22,
-                                  ),
-                                ),
-                              ),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _goalDuration = Duration(
+                            hours: tempHours,
+                            minutes: tempMinutes,
+                          );
+                        });
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              // Duration pickers (hours and minutes)
+              Expanded(
+                child: Row(
+                  children: [
+                    // Hours picker
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            'Hours',
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: isDark
+                                  ? Colors.white70
+                                  : Colors.grey.shade600,
                             ),
-                            child: CupertinoPicker(
-                              itemExtent: 40,
-                              scrollController: FixedExtentScrollController(
-                                initialItem: tempHours,
-                              ),
-                              onSelectedItemChanged: (index) {
-                                tempHours = index;
-                                HapticFeedback.selectionClick();
-                              },
-                              children: List.generate(
-                                13,
-                                (index) => Center(
-                                  child: Text(
-                                    '$index',
-                                    style: TextStyle(
-                                      fontSize: 22,
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: Theme(
+                              data: Theme.of(context).copyWith(
+                                cupertinoOverrideTheme: CupertinoThemeData(
+                                  brightness: isDark
+                                      ? Brightness.dark
+                                      : Brightness.light,
+                                  textTheme: CupertinoTextThemeData(
+                                    pickerTextStyle: TextStyle(
                                       color: isDark
                                           ? Colors.white
                                           : Colors.black,
+                                      fontSize: 22,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              child: CupertinoPicker(
+                                itemExtent: 40,
+                                scrollController: FixedExtentScrollController(
+                                  initialItem: tempHours,
+                                ),
+                                onSelectedItemChanged: (index) {
+                                  tempHours = index;
+                                  HapticFeedback.selectionClick();
+                                },
+                                children: List.generate(
+                                  13,
+                                  (index) => Center(
+                                    child: Text(
+                                      '$index',
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        color: isDark
+                                            ? Colors.white
+                                            : Colors.black,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
 
-                  // Minutes picker
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          'Minutes',
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: isDark
-                                ? Colors.white70
-                                : Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: Theme(
-                            data: Theme.of(context).copyWith(
-                              cupertinoOverrideTheme: CupertinoThemeData(
-                                brightness: isDark
-                                    ? Brightness.dark
-                                    : Brightness.light,
-                                textTheme: CupertinoTextThemeData(
-                                  pickerTextStyle: TextStyle(
-                                    color: isDark ? Colors.white : Colors.black,
-                                    fontSize: 22,
-                                  ),
-                                ),
-                              ),
+                    // Minutes picker
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            'Minutes',
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: isDark
+                                  ? Colors.white70
+                                  : Colors.grey.shade600,
                             ),
-                            child: CupertinoPicker(
-                              itemExtent: 40,
-                              scrollController: FixedExtentScrollController(
-                                initialItem: tempMinutes,
-                              ),
-                              onSelectedItemChanged: (index) {
-                                tempMinutes = index;
-                                HapticFeedback.selectionClick();
-                              },
-                              children: List.generate(
-                                60,
-                                (index) => Center(
-                                  child: Text(
-                                    '$index',
-                                    style: TextStyle(
-                                      fontSize: 22,
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: Theme(
+                              data: Theme.of(context).copyWith(
+                                cupertinoOverrideTheme: CupertinoThemeData(
+                                  brightness: isDark
+                                      ? Brightness.dark
+                                      : Brightness.light,
+                                  textTheme: CupertinoTextThemeData(
+                                    pickerTextStyle: TextStyle(
                                       color: isDark
                                           ? Colors.white
                                           : Colors.black,
+                                      fontSize: 22,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              child: CupertinoPicker(
+                                itemExtent: 40,
+                                scrollController: FixedExtentScrollController(
+                                  initialItem: tempMinutes,
+                                ),
+                                onSelectedItemChanged: (index) {
+                                  tempMinutes = index;
+                                  HapticFeedback.selectionClick();
+                                },
+                                children: List.generate(
+                                  60,
+                                  (index) => Center(
+                                    child: Text(
+                                      '$index',
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        color: isDark
+                                            ? Colors.white
+                                            : Colors.black,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

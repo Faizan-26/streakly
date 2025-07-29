@@ -1,5 +1,4 @@
 import 'package:device_preview_plus/device_preview_plus.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:streakly/controllers/theme_controller.dart';

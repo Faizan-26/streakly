@@ -28,7 +28,23 @@ class _HomePageState extends ConsumerState<HomePage> {
   final Set<String> _expandedHabits = {};
 
   @override
+  void initState() {
+    super.initState();
+    // Listen to selected date changes to trigger UI updates
+    selectedDate.addListener(_onDateChanged);
+  }
+
+  void _onDateChanged() {
+    if (mounted) {
+      setState(() {
+        // This will trigger a rebuild when the date changes
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    selectedDate.removeListener(_onDateChanged);
     selectedDate.dispose();
     super.dispose();
   }
@@ -141,30 +157,49 @@ class _HomePageState extends ConsumerState<HomePage> {
             Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(color: appBarColor),
-              child: HorizontalCalender(
-                selectedDate: selectedDate,
-                onDaySelected: (p0) {
-                  selectedDate.value = p0;
-                },
-                perfectDays: {
-                  DateTime.now(),
+              child: ValueListenableBuilder<DateTime>(
+                valueListenable: selectedDate,
+                builder: (context, currentDate, child) {
+                  return Consumer(
+                    builder: (context, ref, child) {
+                      final calendarDataAsync = ref.watch(calendarDataProvider);
 
-                  DateTime.now().add(const Duration(days: 1)),
-                  DateTime.now().add(const Duration(days: 2)),
-                  DateTime.now().subtract(const Duration(days: 1)),
-                  DateTime.now().subtract(const Duration(days: 2)),
-                  DateTime.now().subtract(const Duration(days: 3)),
-                  DateTime.now().subtract(const Duration(days: 4)),
-                  DateTime.now().subtract(const Duration(days: 5)),
-                  DateTime.now().subtract(const Duration(days: 6)),
+                      return calendarDataAsync.when(
+                        data: (calendarData) {
+                          final perfectDays =
+                              calendarData['perfectDays'] as Set<DateTime>;
+                          final progressMap =
+                              calendarData['progressMap']
+                                  as Map<DateTime, double>;
 
-                  DateTime.now().subtract(const Duration(days: 7)),
-                },
-                progressMap: {
-                  DateTime.now(): 0.8,
-                  DateTime.now().add(const Duration(days: 3)): 0.6,
-                  DateTime.now().subtract(const Duration(days: 12)): 0.4,
-                  DateTime.now().subtract(const Duration(days: 10)): 0.2,
+                          return HorizontalCalender(
+                            selectedDate: selectedDate,
+                            onDaySelected: (p0) {
+                              selectedDate.value = p0;
+                            },
+                            perfectDays: perfectDays,
+                            progressMap: progressMap,
+                          );
+                        },
+                        loading: () => HorizontalCalender(
+                          selectedDate: selectedDate,
+                          onDaySelected: (p0) {
+                            selectedDate.value = p0;
+                          },
+                          perfectDays: {},
+                          progressMap: {},
+                        ),
+                        error: (_, __) => HorizontalCalender(
+                          selectedDate: selectedDate,
+                          onDaySelected: (p0) {
+                            selectedDate.value = p0;
+                          },
+                          perfectDays: {},
+                          progressMap: {},
+                        ),
+                      );
+                    },
+                  );
                 },
               ),
             ),
@@ -190,18 +225,110 @@ class _HomePageState extends ConsumerState<HomePage> {
 
                     // HABIT TILES
                     Expanded(
-                      child: HabitsList(
-                        selectedTimeFilter: _selectedTimeFilter,
-                        selectedDate: selectedDate.value,
-                        isDark: isDark,
-                        expandedHabits: _expandedHabits,
-                        onHabitToggle: _handleHabitToggle,
-                        onStartGoal: (habitId) =>
-                            _startGoal(_getHabitById(habitId)),
-                        onFinishGoal: (habitId) =>
-                            _finishGoal(_getHabitById(habitId)),
+                      child: ValueListenableBuilder<DateTime>(
+                        valueListenable: selectedDate,
+                        builder: (context, currentDate, child) {
+                          return HabitsList(
+                            selectedTimeFilter: _selectedTimeFilter,
+                            selectedDate: currentDate,
+                            isDark: isDark,
+                            expandedHabits: _expandedHabits,
+                            onHabitToggle: _handleHabitToggle,
+                            onStartGoal: (habitId) =>
+                                _startGoal(_getHabitById(habitId)),
+                            onFinishGoal: (habitId) =>
+                                _finishGoal(_getHabitById(habitId)),
+                            onEditHabit: _editHabit,
+                            onDeleteHabit: _deleteHabit,
+                          );
+                        },
                       ),
                     ),
+
+                    // DEBUG INFO (remove in production)
+                    if (true) // Set to false to hide
+                      Consumer(
+                        builder: (context, ref, child) {
+                          final habitState = ref.watch(habitControllerProvider);
+                          final filteredHabits = ref.watch(
+                            filteredHabitsProvider((
+                              selectedDate: selectedDate.value,
+                              timeFilter: _selectedTimeFilter,
+                            )),
+                          );
+
+                          return Container(
+                            margin: const EdgeInsets.symmetric(vertical: 8),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.grey[800]
+                                  : Colors.grey[200],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Debug Info:',
+                                  style: AppTypography.labelSmall.copyWith(
+                                    color: isDark ? Colors.white : Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Total habits: ${habitState.habits.length}',
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: isDark
+                                        ? Colors.white70
+                                        : Colors.black87,
+                                  ),
+                                ),
+                                Text(
+                                  'Filtered habits: ${filteredHabits.length}',
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: isDark
+                                        ? Colors.white70
+                                        : Colors.black87,
+                                  ),
+                                ),
+                                Text(
+                                  'Selected date: ${getDateString(selectedDate.value)}',
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: isDark
+                                        ? Colors.white70
+                                        : Colors.black87,
+                                  ),
+                                ),
+                                Text(
+                                  'Time filter: ${_selectedTimeFilter.name}',
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: isDark
+                                        ? Colors.white70
+                                        : Colors.black87,
+                                  ),
+                                ),
+                                Text(
+                                  'Loading: ${habitState.isLoading}',
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: isDark
+                                        ? Colors.white70
+                                        : Colors.black87,
+                                  ),
+                                ),
+                                if (habitState.error != null)
+                                  Text(
+                                    'Error: ${habitState.error}',
+                                    style: AppTypography.bodySmall.copyWith(
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                   ],
                 ),
               ),
@@ -238,7 +365,11 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     final habitState = ref.read(habitControllerProvider);
     final hasGoal = habit.goalDuration != null || habit.goalCount != null;
-    final isCompleted = habitState.isHabitCompletedToday(habit.id);
+    final currentSelectedDate = selectedDate.value;
+    final isCompleted = habitState.isHabitCompletedOnDate(
+      habit.id,
+      currentSelectedDate,
+    );
 
     if (hasGoal) {
       setState(() {
@@ -249,13 +380,34 @@ class _HomePageState extends ConsumerState<HomePage> {
         }
       });
     } else {
-      // Toggle completion for simple habits
+      // Toggle completion for simple habits on the selected date
+      final today = DateTime.now();
+      final isToday = _isSameDay(currentSelectedDate, today);
+
       if (isCompleted) {
-        ref.read(habitControllerProvider.notifier).uncompleteHabit(habit.id);
+        if (isToday) {
+          ref.read(habitControllerProvider.notifier).uncompleteHabit(habit.id);
+        } else {
+          ref
+              .read(habitControllerProvider.notifier)
+              .uncompleteHabitForDate(habit.id, currentSelectedDate);
+        }
       } else {
-        ref.read(habitControllerProvider.notifier).completeHabit(habit.id);
+        if (isToday) {
+          ref.read(habitControllerProvider.notifier).completeHabit(habit.id);
+        } else {
+          ref
+              .read(habitControllerProvider.notifier)
+              .completeHabitForDate(habit.id, currentSelectedDate);
+        }
       }
     }
+  }
+
+  bool _isSameDay(DateTime date1, DateTime date2) {
+    return date1.year == date2.year &&
+        date1.month == date2.month &&
+        date1.day == date2.day;
   }
 
   void _startGoal(Habit? habit) {
@@ -272,8 +424,19 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   void _finishGoal(Habit? habit) {
     if (habit == null) return;
-    // Mark habit as completed and close expanded view
-    ref.read(habitControllerProvider.notifier).completeHabit(habit.id);
+    // Mark habit as completed for the selected date and close expanded view
+    final currentSelectedDate = selectedDate.value;
+    final today = DateTime.now();
+    final isToday = _isSameDay(currentSelectedDate, today);
+
+    if (isToday) {
+      ref.read(habitControllerProvider.notifier).completeHabit(habit.id);
+    } else {
+      ref
+          .read(habitControllerProvider.notifier)
+          .completeHabitForDate(habit.id, currentSelectedDate);
+    }
+
     setState(() {
       _expandedHabits.remove(habit.id);
     });
@@ -282,6 +445,57 @@ class _HomePageState extends ConsumerState<HomePage> {
       SnackBar(
         content: Text('${habit.title} completed!'),
         backgroundColor: habit.color,
+      ),
+    );
+  }
+
+  void _editHabit(String habitId) {
+    // TODO: Navigate to edit habit page
+    // For now, just show a placeholder
+    final habit = _getHabitById(habitId);
+    if (habit != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Edit ${habit.title} (Coming soon...)'),
+          backgroundColor: habit.color,
+        ),
+      );
+    }
+  }
+
+  void _deleteHabit(String habitId) async {
+    final habit = _getHabitById(habitId);
+    if (habit == null) return;
+
+    // Delete the habit using the controller
+    await ref.read(habitControllerProvider.notifier).deleteHabit(habitId);
+
+    // Remove from expanded habits set
+    setState(() {
+      _expandedHabits.remove(habitId);
+    });
+
+    // Force calendar refresh by invalidating the provider
+    ref.invalidate(calendarDataProvider);
+
+    // Show confirmation message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${habit.title} deleted'),
+        backgroundColor: Colors.red,
+        action: SnackBarAction(
+          label: 'UNDO',
+          textColor: Colors.white,
+          onPressed: () {
+            // TODO: Implement undo functionality
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Undo feature coming soon...'),
+                backgroundColor: Colors.grey,
+              ),
+            );
+          },
+        ),
       ),
     );
   }

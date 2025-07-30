@@ -39,7 +39,7 @@ class NavBar extends StatelessWidget {
           margin: EdgeInsets.only(bottom: 8, left: 8, right: 8),
           height: 90,
           borderRadius: 30,
-          blur: 15,
+          blur: 2,
           alignment: Alignment.center,
           border: 2,
           linearGradient: LinearGradient(

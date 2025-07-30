@@ -22,8 +22,8 @@ dependencies:
   blurrycontainer: ^2.1.0
   awesome_bottom_bar: ^1.2.4
   glassmorphism: ^3.0.0
-  table_calendar: ^3.1.0
   intl: ^0.20.2
+  table_calendar: ^3.2.0
 
 dev_dependencies:
   flutter_test:

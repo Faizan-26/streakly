@@ -1,6 +1,5 @@
 import 'package:device_preview_plus/device_preview_plus.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:streakly/controllers/theme_controller.dart';
@@ -8,18 +7,17 @@ import 'package:streakly/pages/main_wrapper.dart';
 import 'package:streakly/pages/onboarding/page.dart';
 import 'package:streakly/services/notification_service.dart';
 import 'package:streakly/theme/app_theme.dart';
-import 'package:streakly/utils/habit_data_migration.dart';
+// import 'package:streakly/utils/habit_data_migration.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Run data migration for existing habits
-  await HabitDataMigration.migrateIfNeeded();
+  // await HabitDataMigration.migrateIfNeeded();
 
   // Initialize notification services
   await NotificationService.initialize();
-  // await NotificationManager.initialize();
-  // await NotificationManager.setupIsolateListener();
+  await NotificationManager.initialize();
+  await NotificationManager.setupIsolateListener();
 
   runApp(
     DevicePreview(

@@ -97,7 +97,12 @@ class _HomePageState extends State<HomePage> {
 
                   DateTime.now().subtract(const Duration(days: 7)),
                 },
-                progressMap: {},
+                progressMap: {
+                  DateTime.now(): 0.8,
+                  DateTime.now().add(const Duration(days: 3)): 0.6,
+                  DateTime.now().subtract(const Duration(days: 12)): 0.4,
+                  DateTime.now().subtract(const Duration(days: 10)): 0.2,
+                },
               ),
             ),
             Expanded(

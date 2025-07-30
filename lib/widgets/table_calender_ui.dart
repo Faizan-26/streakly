@@ -48,6 +48,125 @@ Widget horizontalCalender({
     );
   }
 
+  Widget buildCustomDay(BuildContext context, DateTime day) {
+    final progress = getProgress(day);
+    final perfect = isPerfectDay(day);
+    final streak = isStreakDay(day);
+    final today = isToday(day);
+    final selected = isSelected(day);
+
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        // Streak line (left) - extends from left edge to circle center
+        if (streak &&
+            isPerfectDay(day.subtract(const Duration(days: 1))) &&
+            !isLeftMostPerfectDay(day))
+          Positioned(
+            left: 0,
+            right: null,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: Container(
+                width: MediaQuery.of(context).size.width / 7 / 2,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: green.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+          ),
+        // Streak line (right) - extends from circle center to right edge
+        if (streak &&
+            isPerfectDay(day.add(const Duration(days: 1))) &&
+            !isRightMostPerfectDay(day))
+          Positioned(
+            right: 0,
+            left: null,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: Container(
+                width: MediaQuery.of(context).size.width / 7 / 2,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: green.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+          ),
+        // Circular progress indicator
+        if (progress != null && progress < 1.0 && progress > 0.0)
+          SizedBox(
+            width: 36,
+            height: 36,
+            child: CircularProgressIndicator(
+              value: progress,
+              strokeWidth: 3,
+              backgroundColor: lightGrey,
+              valueColor: AlwaysStoppedAnimation<Color>(green),
+            ),
+          ),
+        // Filled circle for perfect day
+        if (perfect)
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: selected ? green.withOpacity(0.8) : green,
+              shape: BoxShape.circle,
+              boxShadow: [
+                if (today)
+                  BoxShadow(
+                    color: green.withOpacity(0.3),
+                    blurRadius: 8,
+                    spreadRadius: 2,
+                  ),
+              ],
+            ),
+          ),
+        // Selection indicator for non-perfect days
+        if (selected && !perfect)
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(color: green, shape: BoxShape.circle),
+          ),
+        // Highlight today (if not perfect and not selected)
+        if (today && !perfect && !selected)
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              border: Border.all(color: green, width: 2),
+              shape: BoxShape.circle,
+            ),
+          ),
+        // Day number
+        Center(
+          child: Text(
+            '${day.day}',
+            style: perfect || selected
+                ? AppTypography.bodyMedium.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  )
+                : today
+                ? AppTypography.bodyMedium.copyWith(
+                    color: green,
+                    fontWeight: FontWeight.bold,
+                  )
+                : AppTypography.bodyMedium.copyWith(color: Colors.black),
+          ),
+        ),
+      ],
+    );
+  }
+
   return TableCalendar(
     firstDay: DateTime.utc(2020, 1, 1),
     lastDay: DateTime.utc(2100, 12, 31),
@@ -61,133 +180,34 @@ Widget horizontalCalender({
       onDaySelected(selected);
     },
     calendarStyle: CalendarStyle(
+      isTodayHighlighted: false,
       outsideDaysVisible: false,
-      todayDecoration: BoxDecoration(
-        // border: Border.all(color: green, width: 2),
-        // shape: BoxShape.circle,
-      ),
-      selectedDecoration: BoxDecoration(shape: BoxShape.circle),
-      defaultTextStyle: AppTypography.bodyMedium.copyWith(color: Colors.black),
-      weekendTextStyle: AppTypography.bodyMedium.copyWith(color: Colors.red),
-      todayTextStyle: AppTypography.bodyMedium.copyWith(
-        color: green,
-        fontWeight: FontWeight.bold,
-      ),
-      selectedTextStyle: AppTypography.bodyMedium.copyWith(
-        color: Colors.white,
-        fontWeight: FontWeight.bold,
-      ),
+      // Remove all default decorations
+      todayDecoration: BoxDecoration(),
+      selectedDecoration: BoxDecoration(),
+      defaultDecoration: BoxDecoration(),
+      weekendDecoration: BoxDecoration(),
+      // Remove all default text styles
+      defaultTextStyle: TextStyle(color: Colors.transparent),
+      weekendTextStyle: TextStyle(color: Colors.transparent),
+      todayTextStyle: TextStyle(color: Colors.transparent),
+      selectedTextStyle: TextStyle(color: Colors.transparent),
+      outsideTextStyle: TextStyle(color: Colors.transparent),
     ),
     daysOfWeekStyle: DaysOfWeekStyle(
       weekdayStyle: AppTypography.bodySmall.copyWith(color: grey),
       weekendStyle: AppTypography.bodySmall.copyWith(color: Colors.red),
     ),
     calendarBuilders: CalendarBuilders(
-      defaultBuilder: (context, day, focusedDay) {
-        final progress = getProgress(day);
-        final perfect = isPerfectDay(day);
-        final streak = isStreakDay(day);
-        final today = isToday(day);
-        final selected = isSelected(day);
-
-        return Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.center,
-          children: [
-            // Streak line (left)
-            if (streak &&
-                isPerfectDay(day.subtract(const Duration(days: 1))) &&
-                !isLeftMostPerfectDay(day))
-              Positioned(
-                left: 0,
-                right: null,
-                top: 20,
-                bottom: 20,
-                child: Container(
-                  width: 12,
-                  height: 2,
-                  color: green.withOpacity(0.7),
-                ),
-              ),
-            // Streak line (right)
-            if (streak &&
-                isPerfectDay(day.add(const Duration(days: 1))) &&
-                !isRightMostPerfectDay(day))
-              Positioned(
-                right: 0,
-                left: null,
-                top: 20,
-                bottom: 20,
-                child: Container(
-                  width: 12,
-                  height: 2,
-                  color: green.withOpacity(0.7),
-                ),
-              ),
-            // Circular progress indicator
-            if (progress != null && progress < 1.0 && progress > 0.0)
-              SizedBox(
-                width: 36,
-                height: 36,
-                child: CircularProgressIndicator(
-                  value: progress,
-                  strokeWidth: 3,
-                  backgroundColor: lightGrey,
-                  valueColor: AlwaysStoppedAnimation<Color>(green),
-                ),
-              ),
-            // Filled circle for perfect day
-            if (perfect)
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: green,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    if (today)
-                      BoxShadow(
-                        color: green.withOpacity(0.3),
-                        blurRadius: 8,
-                        spreadRadius: 2,
-                      ),
-                  ],
-                ),
-              ),
-            // Highlight today (if not perfect)
-            if (today && !perfect)
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  border: Border.all(color: green, width: 2),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            // Day number
-            Center(
-              child: Text(
-                '${day.day}',
-                style: perfect
-                    ? AppTypography.bodyMedium.copyWith(
-                        // color: darkGreen,
-                        fontWeight: FontWeight.bold,
-                      )
-                    : today
-                    ? AppTypography.bodyMedium.copyWith(
-                        // color: green,
-                        fontWeight: FontWeight.bold,
-                      )
-                    : AppTypography.bodyMedium.copyWith(color: Colors.black),
-              ),
-            ),
-          ],
-        );
-      },
-      todayBuilder: (context, day, focusedDay) =>
-          null, // handled in defaultBuilder
+      defaultBuilder: (context, day, focusedDay) =>
+          buildCustomDay(context, day),
+      todayBuilder: (context, day, focusedDay) => buildCustomDay(context, day),
       selectedBuilder: (context, day, focusedDay) =>
-          null, // handled in defaultBuilder
+          buildCustomDay(context, day),
+      outsideBuilder: (context, day, focusedDay) =>
+          buildCustomDay(context, day),
+      disabledBuilder: (context, day, focusedDay) =>
+          buildCustomDay(context, day),
       dowBuilder: (context, day) {
         final text = DateFormat.E().format(day);
         return Center(
